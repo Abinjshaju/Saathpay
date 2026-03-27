@@ -64,10 +64,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const register = useCallback(async (email: string, password: string, businessName: string, phone: string, businessType: string): Promise<string | null> => {
-    await supabase.auth.signOut({ scope: "local" });
-    setSession(null);
-    setUser(null);
-    const { data, error } = await supabase.auth.signUp({
+    const { data: { session: existing } } = await supabase.auth.getSession();
+    if (existing) {
+      await supabase.auth.signOut({ scope: "local" });
+      setSession(null);
+      setUser(null);
+    }
+    const { error } = await supabase.auth.signUp({
       email,
       password,
       options: {
@@ -79,7 +82,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       },
     });
     if (error) return error.message;
-    if (!data.session) return "EMAIL_CONFIRM_REQUIRED";
+    await supabase.auth.signOut({ scope: "local" });
+    setSession(null);
+    setUser(null);
     return null;
   }, []);
 

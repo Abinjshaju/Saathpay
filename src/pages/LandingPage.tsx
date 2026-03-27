@@ -1,18 +1,29 @@
-import { useState, useRef, type FormEvent } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useState, useRef, useEffect, type FormEvent } from "react";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import GympayLogo from "@/components/branding/GympayLogo";
 import { btnPrimary, btnSecondary } from "@/lib/buttonStyles";
 import { useAuth } from "@/context/AuthContext";
 
 export default function LandingPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { login } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [step, setStep] = useState<"email" | "password">("email");
   const [error, setError] = useState("");
+  const [registeredNotice, setRegisteredNotice] = useState("");
   const [loading, setLoading] = useState(false);
   const passwordRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const st = location.state as { registered?: boolean; email?: string } | null;
+    if (st?.registered) {
+      setRegisteredNotice("Account created. Please sign in with your email and password.");
+      if (st.email) setEmail(st.email);
+      navigate(location.pathname, { replace: true, state: null });
+    }
+  }, [location, navigate]);
 
   function handleEmailContinue(e: FormEvent) {
     e.preventDefault();
@@ -51,6 +62,12 @@ export default function LandingPage() {
         <h3 className="mt-4 text-center text-base font-bold tracking-tight text-ink">
           {step === "email" ? "Log in or sign up" : "Enter your password"}
         </h3>
+
+        {registeredNotice && (
+          <p className="mt-3 rounded-lg border-l-2 border-status-paid bg-status-paid/5 px-4 py-2 text-sm font-medium text-ink">
+            {registeredNotice}
+          </p>
+        )}
 
         {error && (
           <p className="mt-3 rounded-lg border-l-2 border-status-overdue bg-status-overdue/5 px-4 py-2 text-sm font-medium text-status-overdue">

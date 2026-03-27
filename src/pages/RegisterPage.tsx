@@ -35,13 +35,10 @@ export default function RegisterPage() {
     setLoading(true);
     const err = await register(email, password, businessName, phone, businessType);
     setLoading(false);
-    if (err === "EMAIL_CONFIRM_REQUIRED") {
-      setError("Check your email to confirm your account, then log in.");
-      navigate("/", { replace: true });
-    } else if (err) {
+    if (err) {
       setError(err);
     } else {
-      navigate("/dashboard", { replace: true });
+      navigate("/", { replace: true, state: { registered: true, email: email.trim() } });
     }
   }
 
