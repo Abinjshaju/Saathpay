@@ -13,7 +13,7 @@ const menuItems = [
 ];
 
 export default function SettingsPage() {
-  const { logout, user } = useAuth();
+  const { logout } = useAuth();
   const navigate = useNavigate();
   const { theme, toggle: toggleTheme } = useTheme();
   const isDark = theme === "dark";
@@ -38,7 +38,7 @@ export default function SettingsPage() {
       <div className="pt-4 lg:p-8">
         <div className="lg:grid lg:max-w-4xl lg:grid-cols-[280px_1fr] lg:gap-8">
           <div className="mx-5 rounded-3xl bg-elevated px-5 py-5 shadow-level1 lg:mx-0 lg:self-start">
-            <div className="flex it flex-col gap-3">
+            <div className="flex flex-col gap-3">
               <GympayLogo size="lg" />
             </div>
           </div>
