@@ -38,8 +38,12 @@ export default function SettingsPage() {
       <div className="pt-4 lg:p-8">
         <div className="lg:grid lg:max-w-4xl lg:grid-cols-[280px_1fr] lg:gap-8">
           <div className="mx-5 rounded-3xl bg-elevated px-5 py-5 shadow-level1 lg:mx-0 lg:self-start">
-            <div className="flex it flex-col gap-3">
+            <div className="flex flex-col gap-3">
               <GympayLogo size="lg" />
+              <div className="min-w-0">
+                <p className="break-words text-sm font-bold text-ink">{user?.business_name ?? "My Gym"}</p>
+                <p className="mt-0.5 break-words text-xs text-ink-muted">{user?.email ?? ""}</p>
+              </div>
             </div>
           </div>
 
