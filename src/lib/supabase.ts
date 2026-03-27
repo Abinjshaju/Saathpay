@@ -8,5 +8,7 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     persistSession: true,
     autoRefreshToken: true,
     storage: localStorage,
+    // HashRouter uses `/#/route` — must not treat the hash as Supabase OAuth/PKCE tokens.
+    detectSessionInUrl: false,
   },
 });
