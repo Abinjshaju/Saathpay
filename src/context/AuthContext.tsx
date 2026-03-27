@@ -45,9 +45,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, s) => {
       setSession(s);
       if (s?.user) {
-        fetchProfile(s.user.id).then(setUser);
+        fetchProfile(s.user.id).then((p) => {
+          setUser(p);
+          setLoading(false);
+        });
       } else {
         setUser(null);
+        setLoading(false);
       }
     });
 
@@ -60,7 +64,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const register = useCallback(async (email: string, password: string, businessName: string, phone: string, businessType: string): Promise<string | null> => {
-    const { error } = await supabase.auth.signUp({
+    await supabase.auth.signOut({ scope: "local" });
+    setSession(null);
+    setUser(null);
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
@@ -71,11 +78,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         },
       },
     });
-    return error ? error.message : null;
+    if (error) return error.message;
+    if (!data.session) return "EMAIL_CONFIRM_REQUIRED";
+    return null;
   }, []);
 
   const logout = useCallback(async () => {
-    await supabase.auth.signOut();
+    await supabase.auth.signOut({ scope: "local" });
+    setSession(null);
     setUser(null);
   }, []);
 

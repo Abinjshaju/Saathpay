@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import PageHeader from "@/components/layout/PageHeader";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
@@ -16,15 +16,7 @@ const statusBadge: Record<string, { bg: string; text: string; label: string }> =
 
 const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
-function generateMonthOptions() {
-  const now = new Date();
-  const options: string[] = [];
-  for (let offset = -6; offset <= 2; offset++) {
-    const d = new Date(now.getFullYear(), now.getMonth() + offset, 1);
-    options.push(`${MONTH_NAMES[d.getMonth()]} ${d.getFullYear()}`);
-  }
-  return options;
-}
+const MONTH_LABELS_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 export default function MemberDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -44,8 +36,17 @@ export default function MemberDetailPage() {
 
   const [saving, setSaving] = useState(false);
 
-  const monthOptions = useMemo(() => generateMonthOptions(), []);
+  const [pickerYear, setPickerYear] = useState(() => new Date().getFullYear());
   const paidMonths = useMemo(() => new Set(payments.filter((p) => p.status === "paid").map((p) => p.month)), [payments]);
+
+  const toggleMonth = useCallback((month: string) => {
+    setSelectedMonths((prev) => {
+      const next = new Set(prev);
+      if (next.has(month)) next.delete(month);
+      else next.add(month);
+      return next;
+    });
+  }, []);
 
   async function updateMemberStatusFromPayments(
     justInserted?: { status: string }[],
@@ -135,15 +136,6 @@ export default function MemberDetailPage() {
     await fetchPayments();
   }
 
-  function toggleMonth(month: string) {
-    setSelectedMonths((prev) => {
-      const next = new Set(prev);
-      if (next.has(month)) next.delete(month);
-      else next.add(month);
-      return next;
-    });
-  }
-
   async function handleRecordPayment() {
     if (selectedMonths.size === 0 || !recordAmount) return;
     setSaving(true);
@@ -192,6 +184,7 @@ export default function MemberDetailPage() {
     setShowRecord(true);
     setSelectedMonths(new Set());
     setRecordAmount(String(Number(member!.monthly_fee)));
+    setPickerYear(new Date().getFullYear());
   }
 
   return (
@@ -228,27 +221,46 @@ export default function MemberDetailPage() {
         {/* Record payment form */}
         {showRecord && (
           <div className="list-card px-5 py-5">
-            <p className="text-xs font-bold uppercase tracking-[0.2em] text-ink-muted">
-              Select Months
-            </p>
-            <div className="mt-3 flex flex-wrap gap-2">
-              {monthOptions.map((month) => {
-                const alreadyPaid = paidMonths.has(month);
-                const selected = selectedMonths.has(month);
+            {/* Year navigator */}
+            <div className="flex items-center justify-between">
+              <button
+                type="button"
+                onClick={() => setPickerYear((y) => y - 1)}
+                className="flex h-8 w-8 items-center justify-center rounded-full text-ink-secondary transition hover:bg-elevated hover:text-ink"
+              >
+                <span className="material-symbols-outlined text-xl">chevron_left</span>
+              </button>
+              <p className="text-sm font-bold tabular-nums text-ink">{pickerYear}</p>
+              <button
+                type="button"
+                onClick={() => setPickerYear((y) => y + 1)}
+                className="flex h-8 w-8 items-center justify-center rounded-full text-ink-secondary transition hover:bg-elevated hover:text-ink"
+              >
+                <span className="material-symbols-outlined text-xl">chevron_right</span>
+              </button>
+            </div>
+
+            {/* Month grid */}
+            <div className="mt-3 grid grid-cols-4 gap-2">
+              {MONTH_LABELS_SHORT.map((m, i) => {
+                const key = `${MONTH_NAMES[i]} ${pickerYear}`;
+                const alreadyPaid = paidMonths.has(key);
+                const selected = selectedMonths.has(key);
                 return (
                   <button
-                    key={month}
+                    key={key}
+                    type="button"
                     disabled={alreadyPaid}
-                    onClick={() => toggleMonth(month)}
-                    className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-all duration-200 ease-out ${
+                    onClick={() => toggleMonth(key)}
+                    className={`rounded-xl py-2.5 text-xs font-semibold transition-all duration-200 ease-out ${
                       alreadyPaid
-                        ? "cursor-not-allowed border-border text-ink-muted/40 line-through"
+                        ? "cursor-not-allowed bg-elevated/50 text-ink-muted/40 line-through"
                         : selected
-                          ? "border-lime bg-lime text-[#0B0F14] shadow-glow-lime"
-                          : "border-border bg-elevated text-ink-secondary hover:border-ink-muted hover:text-ink"
+                          ? "bg-lime text-[#0B0F14] shadow-glow-lime"
+                          : "bg-elevated text-ink-secondary hover:bg-border hover:text-ink"
                     }`}
                   >
-                    {month}
+                    {m}
                   </button>
                 );
               })}

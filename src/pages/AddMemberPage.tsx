@@ -2,6 +2,7 @@ import { useState, useEffect, type FormEvent } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { btnPrimary, btnSecondary } from "@/lib/buttonStyles";
 import { supabase } from "@/lib/supabase";
+import type { Member } from "@/data/types";
 
 export default function AddMemberPage() {
   const navigate = useNavigate();
@@ -11,6 +12,8 @@ export default function AddMemberPage() {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [fee, setFee] = useState("");
+  /** YYYY-MM-DD for reminder_start_date */
+  const [reminderStart, setReminderStart] = useState("");
   const [saving, setSaving] = useState(false);
   const [loadingEdit, setLoadingEdit] = useState(isEdit);
 
@@ -19,9 +22,12 @@ export default function AddMemberPage() {
     supabase.from("members").select("*").eq("id", id).single()
       .then(({ data }) => {
         if (data) {
-          setName(data.name);
-          setPhone(data.phone ?? "");
-          setFee(String(data.monthly_fee));
+          const m = data as Member;
+          setName(m.name);
+          setPhone(m.phone ?? "");
+          setFee(String(m.monthly_fee));
+          const r = m.reminder_start_date;
+          setReminderStart(r ? String(r).slice(0, 10) : "");
         }
         setLoadingEdit(false);
       });
@@ -32,11 +38,14 @@ export default function AddMemberPage() {
     if (!name.trim()) return;
     setSaving(true);
 
+    const reminderPayload = reminderStart.trim() ? reminderStart.trim() : null;
+
     if (isEdit) {
       await supabase.from("members").update({
         name: name.trim(),
         phone: phone.trim() || null,
         monthly_fee: parseFloat(fee) || 0,
+        reminder_start_date: reminderPayload,
       }).eq("id", id);
     } else {
       await supabase.from("members").insert({
@@ -45,6 +54,7 @@ export default function AddMemberPage() {
         monthly_fee: parseFloat(fee) || 0,
         status: "pending",
         status_label: "New member",
+        reminder_start_date: reminderPayload,
       });
     }
 
@@ -95,6 +105,17 @@ export default function AddMemberPage() {
               </div>
               <input type="number" inputMode="decimal" step="0.01" value={fee} onChange={(e) => setFee(e.target.value)} placeholder="500" className={`${inputClass} pl-8`} />
             </div>
+          </label>
+
+          <label className="flex flex-col gap-1.5">
+            <span className="text-xs font-bold uppercase tracking-wider text-ink-secondary">Reminder start date</span>
+            <span className="text-[11px] text-ink-muted">Optional. Reminders apply from this date onward.</span>
+            <input
+              type="date"
+              value={reminderStart}
+              onChange={(e) => setReminderStart(e.target.value)}
+              className={inputClass}
+            />
           </label>
 
           {!isEdit && (
