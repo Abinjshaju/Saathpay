@@ -147,12 +147,17 @@ function StatCell({
   glow?: boolean;
   danger?: boolean;
 }) {
+  const ringClass =
+    danger ? "bg-status-overdue/15" : glow ? "bg-primary/15" : iconColor;
+  const iconGlyphClass =
+    danger ? "text-status-overdue" : glow ? "text-primary" : iconColor === "bg-primary" ? "text-white" : "text-ink-secondary";
+
   return (
     <div className="flex flex-1 flex-col items-center justify-center gap-1.5 py-4 px-2">
       <span
-        className={`flex h-8 w-8 items-center justify-center rounded-full ${iconColor}`}
+        className={`flex h-8 w-8 items-center justify-center rounded-full ${ringClass}`}
       >
-        <span className="material-symbols-outlined text-base text-white">{icon}</span>
+        <span className={`material-symbols-outlined text-base ${iconGlyphClass}`}>{icon}</span>
       </span>
       <p
         title={value}
