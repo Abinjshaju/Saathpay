@@ -1,0 +1,48 @@
+# Dependencies
+node_modules/
+
+# Build / output
+dist/
+dev-dist/
+build/
+*.local
+
+# Vite
+.vite/
+
+# TypeScript
+*.tsbuildinfo
+
+# Environment & secrets (never commit)
+.env
+.env.*
+!.env.example
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Testing & coverage
+coverage/
+.nyc_output/
+
+# Editor / IDE
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Debug
+*.pem

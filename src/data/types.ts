@@ -21,6 +21,8 @@ export interface Member {
   monthly_fee: number;
   status: PaymentStatus;
   status_label: string | null;
+  /** When set, reminders apply from this calendar date onward */
+  reminder_start_date?: string | null;
   created_at: string;
 }
 

@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
+import { monthKeyFromDate } from "@/lib/months";
 import type { Member, Payment } from "@/data/types";
 
 interface DashboardStats {
@@ -32,7 +33,17 @@ export function useDashboardStats() {
       const overdueCount = members.filter((m) => m.status === "overdue").length;
       const pendingCount = members.filter((m) => m.status === "pending").length;
       const failedCount = members.filter((m) => m.status === "overdue" || m.status === "failed").length;
-      const upcoming = members.filter((m) => m.status === "pending");
+      const currentMonthKey = monthKeyFromDate(new Date());
+      const paidCurrentMonthMemberIds = new Set(
+        paidPayments
+          .filter((p) => p.month === currentMonthKey && p.status === "paid")
+          .map((p) => p.member_id),
+      );
+      const upcoming = members.filter(
+        (m) =>
+          m.status === "pending" &&
+          !paidCurrentMonthMemberIds.has(m.id),
+      );
 
       const paymentReceived = paidPayments.reduce((sum, p) => sum + Number(p.amount), 0);
 

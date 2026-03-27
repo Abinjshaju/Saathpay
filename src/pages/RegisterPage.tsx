@@ -38,7 +38,7 @@ export default function RegisterPage() {
     if (err) {
       setError(err);
     } else {
-      navigate("/dashboard", { replace: true });
+      navigate("/", { replace: true, state: { registered: true, email: email.trim() } });
     }
   }
 

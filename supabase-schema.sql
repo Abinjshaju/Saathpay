@@ -42,6 +42,7 @@ CREATE TABLE IF NOT EXISTS public.members (
   status      TEXT NOT NULL DEFAULT 'pending'
                 CHECK (status IN ('paid','overdue','pending','failed')),
   status_label TEXT,
+  reminder_start_date DATE,
   created_at  TIMESTAMPTZ DEFAULT now()
 );
 
