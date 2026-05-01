@@ -1,7 +1,10 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
+import { nextBillingDateFromReminder, isDueWithinNextDays } from "@/lib/billingDates";
 import { monthKeyFromDate } from "@/lib/months";
 import type { Member, Payment } from "@/data/types";
+
+const UPCOMING_WINDOW_DAYS = 30;
 
 interface DashboardStats {
   totalMembers: number;
@@ -39,11 +42,22 @@ export function useDashboardStats() {
           .filter((p) => p.month === currentMonthKey && p.status === "paid")
           .map((p) => p.member_id),
       );
-      const upcoming = members.filter(
-        (m) =>
-          m.status === "pending" &&
-          !paidCurrentMonthMemberIds.has(m.id),
-      );
+      const today = new Date();
+      const upcoming = members
+        .filter(
+          (m) =>
+            m.status === "pending" &&
+            !paidCurrentMonthMemberIds.has(m.id),
+        )
+        .filter((m) => {
+          const next = nextBillingDateFromReminder(m.reminder_start_date, today);
+          return next !== null && isDueWithinNextDays(next, today, UPCOMING_WINDOW_DAYS);
+        })
+        .sort((a, b) => {
+          const na = nextBillingDateFromReminder(a.reminder_start_date, today)?.getTime() ?? 0;
+          const nb = nextBillingDateFromReminder(b.reminder_start_date, today)?.getTime() ?? 0;
+          return na - nb;
+        });
 
       const paymentReceived = paidPayments.reduce((sum, p) => sum + Number(p.amount), 0);
 
