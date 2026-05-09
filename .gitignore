@@ -1,3 +1,7 @@
+# ============================================================
+# SaathPay Monorepo — .gitignore
+# ============================================================
+
 # Dependencies
 node_modules/
 
@@ -12,6 +16,15 @@ build/
 
 # TypeScript
 *.tsbuildinfo
+
+# Python
+__pycache__/
+*.py[oc]
+*.egg-info/
+wheels/
+.venv/
+.pytest_cache/
+htmlcov/
 
 # Environment & secrets (never commit)
 .env
@@ -43,6 +56,13 @@ coverage/
 .DS_Store
 Thumbs.db
 Desktop.ini
+__MACOSX/
+
+# Docker
+docker-compose.override.yml
 
 # Debug
 *.pem
+
+# uv lock (large, auto-generated)
+# uv.lock

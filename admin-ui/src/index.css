@@ -1,0 +1,173 @@
+:root {
+    --ios-bg: #F2F2F7;
+    --ios-card: #FFFFFF;
+    --ios-blue: #007AFF;
+    --ios-green: #34C759;
+    --ios-red: #FF3B30;
+    --ios-orange: #FF9500;
+    --ios-gray-light: #E5E5EA;
+    --text-main: #000000;
+    --text-muted: #8E8E93;
+    --active-bg: #E5F1FF;
+    --border-color: rgba(0, 0, 0, 0.05);
+    --border-color-strong: rgba(0, 0, 0, 0.1);
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+body {
+    background: var(--ios-bg);
+    min-height: 100vh;
+    display: flex;
+    color: var(--text-main);
+    overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+}
+
+#root {
+    display: flex;
+    width: 100%;
+    height: 100vh;
+}
+
+a {
+    text-decoration: none;
+    color: inherit;
+}
+
+.ios-panel {
+    background: var(--ios-card);
+    border-radius: 20px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03);
+    border: 1px solid var(--border-color);
+}
+
+.btn {
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 14px;
+    cursor: pointer;
+    border: none;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: opacity 0.2s;
+}
+
+.btn:active {
+    opacity: 0.7;
+}
+
+.btn-primary {
+    background: var(--ios-blue);
+    color: #fff;
+    border-radius: 14px;
+    padding: 16px 24px;
+    font-size: 17px;
+    width: 100%;
+    border: none;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.2s ease;
+}
+
+.btn-primary:active {
+    opacity: 0.8;
+}
+
+.btn-pause {
+    background: rgba(255, 149, 0, 0.1);
+    color: var(--ios-orange);
+}
+
+.btn-edit {
+    background: var(--ios-gray-light);
+    color: var(--text-main);
+}
+
+.status-badge {
+    font-size: 11px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.status-active {
+    background: rgba(52, 199, 89, 0.1);
+    color: var(--ios-green);
+}
+
+.status-paused {
+    background: rgba(255, 149, 0, 0.1);
+    color: var(--ios-orange);
+}
+
+/* Sidebar */
+.sidebar {
+    width: 280px;
+    padding: 32px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 32px;
+    background: var(--ios-card);
+    border-right: 1px solid var(--border-color);
+    z-index: 10;
+}
+
+.sidebar-logo {
+    display: flex;
+    align-items: center;
+    padding: 0 16px 12px 16px;
+}
+
+.sidebar-logo img {
+    height: 32px;
+    width: auto;
+}
+
+.nav-menu {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    list-style: none;
+}
+
+.nav-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    border-radius: 12px;
+    cursor: pointer;
+    font-weight: 500;
+    font-size: 15px;
+    color: var(--text-main);
+    transition: all 0.2s ease;
+    text-decoration: none;
+}
+
+.nav-item:hover:not(.active) {
+    background: #F2F2F7;
+}
+
+.nav-item.active {
+    background: var(--active-bg);
+    color: var(--ios-blue);
+}
+
+.nav-item ion-icon {
+    font-size: 22px;
+    color: var(--text-muted);
+    transition: color 0.2s ease;
+}
+
+.nav-item.active ion-icon {
+    color: var(--ios-blue);
+}

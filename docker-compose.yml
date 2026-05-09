@@ -1,12 +1,42 @@
-# Compose loads a file named `.env` in this directory for ${VAR} substitution (not committed).
+# Docker Compose — SaathPay (3 services: user-ui, backend, admin-ui)
+# Loads `.env` in this directory for ${VAR} substitution (not committed).
+
 services:
-  web:
+  backend:
     build:
-      context: .
+      context: ./backend
+      dockerfile: Dockerfile
+    env_file:
+      - ./.env
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  user-ui:
+    build:
+      context: ./user-ui
       dockerfile: Dockerfile
       args:
-        VITE_SUPABASE_URL: ${VITE_SUPABASE_URL:?Add VITE_SUPABASE_URL to .env — see .env.example}
-        VITE_SUPABASE_ANON_KEY: ${VITE_SUPABASE_ANON_KEY:?Add VITE_SUPABASE_ANON_KEY to .env}
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-/api/v1}
     ports:
-      - "${HOST_PORT:-8080}:80"
+      - "${USER_UI_PORT:-8080}:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+  admin-ui:
+    build:
+      context: ./admin-ui
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-/api/v1}
+    ports:
+      - "${ADMIN_UI_PORT:-8081}:80"
+    depends_on:
+      - backend
     restart: unless-stopped
