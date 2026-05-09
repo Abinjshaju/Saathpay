@@ -1,18 +1,16 @@
 -- ============================================================
--- Gym Autopay — Supabase Schema
+-- Saathpay — Supabase Schema (Updated)
 -- Run this in the Supabase SQL Editor (Dashboard > SQL Editor)
 -- ============================================================
 
--- 1. USERS (profile / settings for app users — gym owners)
+-- 1. USERS (profile / settings for app users — gym/business owners)
 CREATE TABLE IF NOT EXISTS public.users (
   id            UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   email         TEXT NOT NULL,
-  business_name TEXT DEFAULT 'My Gym',
+  business_name TEXT DEFAULT 'My Business',
   phone         TEXT,
   business_type TEXT NOT NULL DEFAULT 'gym'
                   CHECK (business_type IN ('gym','yoga','dance')),
-  api_key       TEXT,
-  secret_key    TEXT,
   created_at    TIMESTAMPTZ DEFAULT now()
 );
 
@@ -32,13 +30,14 @@ CREATE POLICY "Users can insert own profile"
   WITH CHECK (id = auth.uid());
 
 
--- 2. MEMBERS (gym customers, owned by a user via tid)
+-- 2. MEMBERS (owned by a user via tid)
 CREATE TABLE IF NOT EXISTS public.members (
   id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   tid         UUID NOT NULL DEFAULT auth.uid() REFERENCES public.users(id) ON DELETE CASCADE,
   name        TEXT NOT NULL,
   phone       TEXT,
   monthly_fee NUMERIC(10,2) NOT NULL DEFAULT 0,
+  join_date   DATE DEFAULT CURRENT_DATE,
   status      TEXT NOT NULL DEFAULT 'pending'
                 CHECK (status IN ('paid','overdue','pending','failed')),
   status_label TEXT,
@@ -100,7 +99,6 @@ CREATE POLICY "Tenant can delete own payments"
 
 
 -- 4. AUTO-CREATE user profile on signup
--- This trigger fires after a new auth.users row is created
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -108,7 +106,7 @@ BEGIN
   VALUES (
     NEW.id,
     NEW.email,
-    COALESCE(NEW.raw_user_meta_data->>'business_name', 'My Gym'),
+    COALESCE(NEW.raw_user_meta_data->>'business_name', 'My Business'),
     NEW.raw_user_meta_data->>'phone',
     COALESCE(NEW.raw_user_meta_data->>'business_type', 'gym')
   );

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/utils/supabase";
 import type { Member, PaymentStatus } from "@/data/types";
 
 export function useMembers() {
@@ -20,22 +20,25 @@ export function useMembers() {
 
   useEffect(() => { fetchMembers(); }, [fetchMembers]);
 
-  const addMember = useCallback(async (m: { name: string; phone: string; monthly_fee: number; reminder_start_date?: string | null }) => {
+  const addMember = useCallback(async (m: { name: string; phone: string; monthly_fee: number; join_date?: string | null; reminder_start_date?: string | null }) => {
     const { error: err } = await supabase.from("members").insert({
       name: m.name,
       phone: m.phone,
       monthly_fee: m.monthly_fee,
+      join_date: m.join_date ?? new Date().toISOString().split('T')[0],
       status: "pending" as PaymentStatus,
-      status_label: "New member",
-      reminder_start_date: m.reminder_start_date ?? null,
+      // status_label: "New member", // Missing in DB
+      // reminder_start_date: m.reminder_start_date ?? null, // Missing in DB
     });
     if (err) return err.message;
     await fetchMembers();
     return null;
   }, [fetchMembers]);
 
-  const updateMember = useCallback(async (id: string, updates: Partial<Pick<Member, "name" | "phone" | "monthly_fee" | "status" | "status_label" | "reminder_start_date">>) => {
-    const { error: err } = await supabase.from("members").update(updates).eq("id", id);
+  const updateMember = useCallback(async (id: string, updates: Partial<Pick<Member, "name" | "phone" | "monthly_fee" | "status" | "status_label" | "reminder_start_date" | "next_due_date">>) => {
+    // Filter out missing columns
+    const { status_label, reminder_start_date, next_due_date, ...validUpdates } = updates as any;
+    const { error: err } = await supabase.from("members").update(validUpdates).eq("id", id);
     if (err) return err.message;
     await fetchMembers();
     return null;

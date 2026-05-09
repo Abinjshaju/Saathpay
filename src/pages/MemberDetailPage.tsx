@@ -1,11 +1,13 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import PageHeader from "@/components/layout/PageHeader";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import { btnDangerOutline, btnPrimary, btnSecondary } from "@/lib/buttonStyles";
-import { useMember } from "@/hooks/useMembers";
+import { useMember, useMembers } from "@/hooks/useMembers";
 import { usePayments } from "@/hooks/usePayments";
-import { supabase } from "@/lib/supabase";
+import { useUserProfile } from "@/hooks/useUserProfile";
+import { supabase } from "@/utils/supabase";
+import { sendTwilioMessage } from "@/lib/twilio";
 
 const statusBadge: Record<string, { bg: string; text: string; label: string }> = {
   paid: { bg: "bg-status-paid/10", text: "text-status-paid", label: "Paid" },
@@ -16,83 +18,112 @@ const statusBadge: Record<string, { bg: string; text: string; label: string }> =
 
 const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
-const MONTH_LABELS_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-
 export default function MemberDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { member, loading: memberLoading } = useMember(id);
   const { payments, loading: paymentsLoading, fetchPayments } = usePayments(id);
+  const { updateMember } = useMembers();
+  const { profile } = useUserProfile();
+  
   const [showDelete, setShowDelete] = useState(false);
-
-  // Mark existing unpaid payment
+  const [saving, setSaving] = useState(false);
   const [markingId, setMarkingId] = useState<string | null>(null);
   const [markAmount, setMarkAmount] = useState("");
+  
+  const [nextDueDate, setNextDueDate] = useState("");
+  const [sendingReminder, setSendingReminder] = useState<"whatsapp" | "sms" | null>(null);
+  const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
 
-  // Record new payment (one or more months)
-  const [showRecord, setShowRecord] = useState(false);
-  const [selectedMonths, setSelectedMonths] = useState<Set<string>>(new Set());
-  const [recordAmount, setRecordAmount] = useState("");
-
-  const [saving, setSaving] = useState(false);
-
-  const [pickerYear, setPickerYear] = useState(() => new Date().getFullYear());
-  const paidMonths = useMemo(() => new Set(payments.filter((p) => p.status === "paid").map((p) => p.month)), [payments]);
-
-  const toggleMonth = useCallback((month: string) => {
-    setSelectedMonths((prev) => {
-      const next = new Set(prev);
-      if (next.has(month)) next.delete(month);
-      else next.add(month);
-      return next;
-    });
-  }, []);
-
-  async function updateMemberStatusFromPayments(
-    justInserted?: { status: string }[],
-  ) {
-    const now = new Date();
-    const currentMonth = `${MONTH_NAMES[now.getMonth()]} ${now.getFullYear()}`;
-
-    const allPayments = justInserted
-      ? [...payments, ...(justInserted as typeof payments)]
-      : payments;
-
-    const currentMonthPayments = allPayments.filter((p) => p.month === currentMonth);
-    const hasPaidCurrent = currentMonthPayments.some((p) => p.status === "paid");
-
-    if (justInserted) {
-      const anyPaid = justInserted.some((r) => r.status === "paid");
-      if (anyPaid || hasPaidCurrent) {
-        await supabase
-          .from("members")
-          .update({ status: "paid", status_label: `Paid for ${currentMonth}` })
-          .eq("id", id);
-        return;
-      }
+  useEffect(() => {
+    if (member?.next_due_date) {
+      setNextDueDate(member.next_due_date);
     }
+  }, [member]);
 
-    if (hasPaidCurrent) {
-      await supabase
-        .from("members")
-        .update({ status: "paid", status_label: `Paid for ${currentMonth}` })
-        .eq("id", id);
-    } else {
-      const { data: freshPayments } = await supabase
-        .from("payments")
-        .select("status, month")
-        .eq("member_id", id!);
-      const paid = (freshPayments ?? []).some(
-        (p) => p.month === currentMonth && p.status === "paid",
-      );
-      if (paid) {
-        await supabase
-          .from("members")
-          .update({ status: "paid", status_label: `Paid for ${currentMonth}` })
-          .eq("id", id);
-      }
+  const handleUpdateDueDate = async (date: string) => {
+    setNextDueDate(date);
+    if (id) {
+      await updateMember(id, { next_due_date: date });
     }
+  };
+
+  async function handleMarkPaid() {
+    if (!markingId || !markAmount) return;
+    setSaving(true);
+    const today = new Date();
+    const dateStr = `Paid on ${MONTH_NAMES[today.getMonth()]} ${today.getDate()}, ${today.getFullYear()}`;
+    await supabase.from("payments").update({
+      status: "paid",
+      amount: parseFloat(markAmount),
+      date: dateStr,
+    }).eq("id", markingId);
+    
+    // Update member status
+    const currentMonth = `${MONTH_NAMES[today.getMonth()]} ${today.getFullYear()}`;
+    await supabase.from("members").update({ 
+      status: "paid", 
+      // status_label: `Paid for ${currentMonth}` // Missing in DB
+    }).eq("id", id);
+
+    setMarkingId(null);
+    setMarkAmount("");
+    setSaving(false);
+    await fetchPayments();
   }
+
+  async function handleDelete() {
+    await supabase.from("members").delete().eq("id", id);
+    setShowDelete(false);
+    navigate("/members", { replace: true });
+  }
+
+  const handleSendReminder = async (channel: "whatsapp" | "sms") => {
+    if (!member || !profile) return;
+    if (!member.phone) {
+      setToast({ message: "Member phone number missing", type: "error" });
+      return;
+    }
+    if (!nextDueDate) {
+      setToast({ message: "Please set a due date first", type: "error" });
+      return;
+    }
+
+    setSendingReminder(channel);
+    try {
+      const businessName = profile.business_name || "SaathPay";
+      const amount = Number(member.monthly_fee).toLocaleString("en-IN");
+      const formattedDate = new Date(nextDueDate).toLocaleDateString("en-IN", {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+      });
+
+      const body = `SaathPay Reminder: 
+
+Dear ${member.name}, 
+This is a friendly reminder from ${businessName}. Your monthly fee of ₹${amount} is due on ${formattedDate}.
+
+Please ensure payment is made by the due date. If you have already paid, please ignore this message.
+
+Regards,
+${businessName}`;
+
+      await sendTwilioMessage({
+        to: member.phone,
+        body,
+        channel,
+      });
+
+      setToast({ message: `Reminder sent via ${channel === "whatsapp" ? "WhatsApp" : "SMS"}!`, type: "success" });
+    } catch (error: any) {
+      console.error(error);
+      setToast({ message: error.message || "Failed to send reminder", type: "error" });
+    } finally {
+      setSendingReminder(null);
+      setTimeout(() => setToast(null), 3000);
+    }
+  };
 
   if (memberLoading || paymentsLoading) {
     return (
@@ -113,86 +144,12 @@ export default function MemberDetailPage() {
     );
   }
 
-  async function handleDelete() {
-    await supabase.from("members").delete().eq("id", id);
-    setShowDelete(false);
-    navigate("/members", { replace: true });
-  }
-
-  async function handleMarkPaid() {
-    if (!markingId || !markAmount) return;
-    setSaving(true);
-    const today = new Date();
-    const dateStr = `Paid on ${MONTH_NAMES[today.getMonth()]} ${today.getDate()}, ${today.getFullYear()}`;
-    await supabase.from("payments").update({
-      status: "paid",
-      amount: parseFloat(markAmount),
-      date: dateStr,
-    }).eq("id", markingId);
-    await updateMemberStatusFromPayments();
-    setMarkingId(null);
-    setMarkAmount("");
-    setSaving(false);
-    await fetchPayments();
-  }
-
-  async function handleRecordPayment() {
-    if (selectedMonths.size === 0 || !recordAmount) return;
-    setSaving(true);
-    const today = new Date();
-    const dateStr = `Paid on ${MONTH_NAMES[today.getMonth()]} ${today.getDate()}, ${today.getFullYear()}`;
-    const feePerMonth = Number(member!.monthly_fee);
-    let remaining = parseFloat(recordAmount);
-
-    // Sort selected months chronologically so dues are closed oldest-first
-    const sorted = Array.from(selectedMonths).sort((a, b) => {
-      const [mA, yA] = a.split(" ");
-      const [mB, yB] = b.split(" ");
-      const dA = new Date(Number(yA), MONTH_NAMES.indexOf(mA));
-      const dB = new Date(Number(yB), MONTH_NAMES.indexOf(mB));
-      return dA.getTime() - dB.getTime();
-    });
-
-    const rows: { member_id: string | undefined; month: string; date: string; amount: number; status: "paid" | "pending" }[] = [];
-
-    for (const month of sorted) {
-      if (remaining <= 0) {
-        rows.push({ member_id: id, month, date: dateStr, amount: 0, status: "pending" });
-        continue;
-      }
-      const allocated = Math.min(remaining, feePerMonth);
-      remaining = Math.round((remaining - allocated) * 100) / 100;
-      rows.push({
-        member_id: id,
-        month,
-        date: dateStr,
-        amount: Math.round(allocated * 100) / 100,
-        status: allocated >= feePerMonth ? "paid" : "pending",
-      });
-    }
-
-    await supabase.from("payments").insert(rows);
-    await updateMemberStatusFromPayments(rows);
-    setShowRecord(false);
-    setSelectedMonths(new Set());
-    setRecordAmount("");
-    setSaving(false);
-    await fetchPayments();
-  }
-
-  function openRecordForm() {
-    setShowRecord(true);
-    setSelectedMonths(new Set());
-    setRecordAmount(String(Number(member!.monthly_fee)));
-    setPickerYear(new Date().getFullYear());
-  }
-
   return (
     <div className="flex flex-1 flex-col bg-bg">
       <PageHeader title={member.name} showBack />
 
       <div className="space-y-4 px-5 pt-4 lg:mx-auto lg:w-full lg:max-w-2xl lg:space-y-6 lg:px-6 lg:py-6">
-        {/* Info */}
+        {/* Info Card */}
         <div className="list-card px-5 py-5">
           <div className="grid grid-cols-2 gap-4">
             <div>
@@ -203,135 +160,44 @@ export default function MemberDetailPage() {
               <p className="text-xs font-bold uppercase tracking-wider text-ink-muted">Monthly Fee</p>
               <p className="mt-1 text-sm font-bold tabular-nums text-ink">₹{Number(member.monthly_fee).toLocaleString("en-IN")}</p>
             </div>
+            <div className="col-span-2 mt-2">
+              <p className="text-xs font-bold uppercase tracking-wider text-ink-muted">Next Due Date</p>
+              <input 
+                type="date" 
+                value={nextDueDate}
+                onChange={(e) => handleUpdateDueDate(e.target.value)}
+                className="mt-1 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:ring-0"
+              />
+            </div>
           </div>
 
-          <div className="mt-5 flex gap-3">
-            <Link to={`/members/${member.id}/edit`} className={`${btnSecondary} shrink-0 px-3`}>
-              <span className="material-symbols-outlined text-[20px]">edit</span>
-            </Link>
-            <button type="button" onClick={openRecordForm} className={`${btnPrimary} min-w-0 flex-1`}>
-              <span className="material-symbols-outlined text-[22px]" style={{ fontVariationSettings: '"FILL" 1' }}>
-                payments
-              </span>
-              Record payment
-            </button>
-          </div>
-        </div>
-
-        {/* Record payment form */}
-        {showRecord && (
-          <div className="list-card px-5 py-5">
-            {/* Year navigator */}
-            <div className="flex items-center justify-between">
-              <button
-                type="button"
-                onClick={() => setPickerYear((y) => y - 1)}
-                className="flex h-8 w-8 items-center justify-center rounded-full text-ink-secondary transition hover:bg-elevated hover:text-ink"
+          <div className="mt-6 flex flex-col gap-3">
+            <div className="flex gap-3">
+              <button 
+                onClick={() => handleSendReminder("whatsapp")}
+                disabled={true}
+                className={`${btnPrimary} flex-1 bg-gray-400 cursor-not-allowed border-none text-white opacity-50`}
+                title="WhatsApp reminders are currently unavailable"
               >
-                <span className="material-symbols-outlined text-xl">chevron_left</span>
+                <span className="material-symbols-outlined text-[22px]">chat</span>
+                WhatsApp Reminder
               </button>
-              <p className="text-sm font-bold tabular-nums text-ink">{pickerYear}</p>
-              <button
-                type="button"
-                onClick={() => setPickerYear((y) => y + 1)}
-                className="flex h-8 w-8 items-center justify-center rounded-full text-ink-secondary transition hover:bg-elevated hover:text-ink"
-              >
-                <span className="material-symbols-outlined text-xl">chevron_right</span>
-              </button>
-            </div>
-
-            {/* Month grid */}
-            <div className="mt-3 grid grid-cols-4 gap-2">
-              {MONTH_LABELS_SHORT.map((m, i) => {
-                const key = `${MONTH_NAMES[i]} ${pickerYear}`;
-                const alreadyPaid = paidMonths.has(key);
-                const selected = selectedMonths.has(key);
-                return (
-                  <button
-                    key={key}
-                    type="button"
-                    disabled={alreadyPaid}
-                    onClick={() => toggleMonth(key)}
-                    className={`rounded-xl py-2.5 text-xs font-semibold transition-all duration-200 ease-out ${
-                      alreadyPaid
-                        ? "cursor-not-allowed bg-elevated/50 text-ink-muted/40 line-through"
-                        : selected
-                          ? "bg-lime text-[#0B0F14] shadow-glow-lime"
-                          : "bg-elevated text-ink-secondary hover:bg-border hover:text-ink"
-                    }`}
-                  >
-                    {m}
-                  </button>
-                );
-              })}
-            </div>
-
-            {selectedMonths.size > 0 && (
-              <>
-                <p className="mt-4 text-xs font-bold uppercase tracking-[0.2em] text-ink-muted">
-                  Total Amount{selectedMonths.size > 1 ? ` (${selectedMonths.size} months)` : ""}
-                </p>
-                <div className="relative mt-2">
-                  <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4">
-                    <span className="text-sm font-medium text-ink-muted">₹</span>
-                  </div>
-                  <input
-                    type="number"
-                    inputMode="decimal"
-                    step="0.01"
-                    value={recordAmount}
-                    onChange={(e) => setRecordAmount(e.target.value)}
-                    className="h-11 w-full rounded-lg border border-border bg-surface pl-8 pr-4 text-base tabular-nums text-ink focus:border-ink focus:ring-0"
-                  />
-                </div>
-                {selectedMonths.size > 1 && recordAmount && (() => {
-                  const feePerMonth = Number(member!.monthly_fee);
-                  let rem = parseFloat(recordAmount);
-                  const sorted = Array.from(selectedMonths).sort((a, b) => {
-                    const [mA, yA] = a.split(" ");
-                    const [mB, yB] = b.split(" ");
-                    return new Date(Number(yA), MONTH_NAMES.indexOf(mA)).getTime() -
-                           new Date(Number(yB), MONTH_NAMES.indexOf(mB)).getTime();
-                  });
-                  return (
-                    <div className="mt-2 space-y-0.5">
-                      {sorted.map((mo) => {
-                        const alloc = Math.min(Math.max(rem, 0), feePerMonth);
-                        rem = Math.round((rem - alloc) * 100) / 100;
-                        return (
-                          <p key={mo} className="flex justify-between text-[10px] text-ink-muted">
-                            <span>{mo}</span>
-                            <span className={alloc >= feePerMonth ? "text-status-paid" : alloc > 0 ? "text-status-pending" : "text-ink-muted"}>
-                              ₹{alloc.toLocaleString("en-IN")} {alloc >= feePerMonth ? "✓" : alloc > 0 ? "(partial)" : "—"}
-                            </span>
-                          </p>
-                        );
-                      })}
-                    </div>
-                  );
-                })()}
-              </>
-            )}
-
-            <div className="mt-4 flex gap-3">
-              <button
-                type="button"
-                onClick={() => { setShowRecord(false); setSelectedMonths(new Set()); setRecordAmount(""); }}
-                className={`${btnSecondary} flex-1`}
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleRecordPayment}
-                disabled={saving || selectedMonths.size === 0 || !recordAmount}
+              <button 
+                onClick={() => handleSendReminder("sms")}
+                disabled={!!sendingReminder}
                 className={`${btnPrimary} flex-1`}
               >
-                {saving ? "Saving..." : "Confirm payment"}
+                <span className="material-symbols-outlined text-[22px]">sms</span>
+                {sendingReminder === "sms" ? "Sending..." : "SMS Reminder"}
               </button>
             </div>
+            
+            <Link to={`/members/${member.id}/edit`} className={`${btnSecondary} w-full justify-center`}>
+              <span className="material-symbols-outlined text-[20px]">edit</span>
+              Edit Details
+            </Link>
           </div>
-        )}
+        </div>
 
         {/* Payment history */}
         <div className="pt-2 lg:px-0">
@@ -346,7 +212,6 @@ export default function MemberDetailPage() {
             <div className="flex flex-col items-center py-10 text-center">
               <span className="material-symbols-outlined mb-2 text-3xl text-ink-muted">receipt_long</span>
               <p className="text-sm text-ink-muted">No payment records yet</p>
-              <p className="mt-1 text-xs text-ink-muted">Use "Record Payment" above to add one.</p>
             </div>
           )}
           {payments.map((p) => {
@@ -442,6 +307,16 @@ export default function MemberDetailPage() {
         onConfirm={handleDelete}
         onCancel={() => setShowDelete(false)}
       />
+
+      {toast && (
+        <div className={`fixed bottom-6 left-1/2 z-30 flex w-11/12 max-w-sm -translate-x-1/2 items-center gap-3 border-l-4 ${toast.type === "success" ? "border-status-paid" : "border-status-overdue"} bg-ink px-4 py-3 text-white`}>
+          <span className="material-symbols-outlined text-lg">{toast.type === "success" ? "check_circle" : "error"}</span>
+          <p className="flex-1 text-sm font-medium">{toast.message}</p>
+          <button onClick={() => setToast(null)}>
+            <span className="material-symbols-outlined text-lg text-white/60 hover:text-white">close</span>
+          </button>
+        </div>
+      )}
     </div>
   );
 }

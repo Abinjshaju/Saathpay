@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/utils/supabase";
 import type { Payment, PaymentStatus } from "@/data/types";
 
 export function usePayments(memberId: string | undefined) {

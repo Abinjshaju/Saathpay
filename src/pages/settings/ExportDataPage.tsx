@@ -1,7 +1,7 @@
 import { useState } from "react";
 import PageHeader from "@/components/layout/PageHeader";
 import { btnPrimary, btnSecondary } from "@/lib/buttonStyles";
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/utils/supabase";
 import { exportCSV, exportExcel } from "@/utils/exportData";
 
 export default function ExportDataPage() {

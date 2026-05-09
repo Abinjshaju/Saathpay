@@ -1,7 +1,7 @@
 import { useState, useEffect, type FormEvent } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { btnPrimary, btnSecondary } from "@/lib/buttonStyles";
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/utils/supabase";
 import type { Member } from "@/data/types";
 
 export default function AddMemberPage() {
@@ -12,23 +12,37 @@ export default function AddMemberPage() {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [fee, setFee] = useState("");
+  const [joinDate, setJoinDate] = useState(new Date().toISOString().split('T')[0]);
   /** YYYY-MM-DD for reminder_start_date */
   const [reminderStart, setReminderStart] = useState("");
   const [saving, setSaving] = useState(false);
   const [loadingEdit, setLoadingEdit] = useState(isEdit);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!id) return;
+    
+    setLoadingEdit(true);
     supabase.from("members").select("*").eq("id", id).single()
-      .then(({ data }) => {
-        if (data) {
+      .then(({ data, error: err }) => {
+        if (err) {
+          console.error("Error fetching member:", err);
+          setError(err.message);
+        } else if (data) {
           const m = data as Member;
           setName(m.name);
           setPhone(m.phone ?? "");
           setFee(String(m.monthly_fee));
-          const r = m.reminder_start_date;
+          setJoinDate(m.join_date ? String(m.join_date).slice(0, 10) : "");
+          // Omit reminder_start_date if column missing in DB
+          const r = (m as any).reminder_start_date;
           setReminderStart(r ? String(r).slice(0, 10) : "");
         }
+        setLoadingEdit(false);
+      })
+      .catch((err) => {
+        console.error("Unexpected error fetching member:", err);
+        setError("Failed to load member details");
         setLoadingEdit(false);
       });
   }, [id]);
@@ -37,25 +51,42 @@ export default function AddMemberPage() {
     e?.preventDefault();
     if (!name.trim()) return;
     setSaving(true);
+    setError(null);
 
-    const reminderPayload = reminderStart.trim() ? reminderStart.trim() : null;
+    // const reminderPayload = reminderStart.trim() ? reminderStart.trim() : null;
 
     if (isEdit) {
-      await supabase.from("members").update({
+      const { error: err } = await supabase.from("members").update({
         name: name.trim(),
         phone: phone.trim() || null,
         monthly_fee: parseFloat(fee) || 0,
-        reminder_start_date: reminderPayload,
+        join_date: joinDate || null,
+        // reminder_start_date: reminderPayload, // Missing in DB
       }).eq("id", id);
+      
+      if (err) {
+        console.error("Error updating member:", err);
+        setError(err.message);
+        setSaving(false);
+        return;
+      }
     } else {
-      await supabase.from("members").insert({
+      const { error: err } = await supabase.from("members").insert({
         name: name.trim(),
         phone: phone.trim() || null,
         monthly_fee: parseFloat(fee) || 0,
+        join_date: joinDate || null,
         status: "pending",
-        status_label: "New member",
-        reminder_start_date: reminderPayload,
+        // status_label: "New member", // Missing in DB
+        // reminder_start_date: reminderPayload, // Missing in DB
       });
+
+      if (err) {
+        console.error("Error inserting member:", err);
+        setError(err.message);
+        setSaving(false);
+        return;
+      }
     }
 
     navigate("/members", { replace: true });
@@ -87,6 +118,11 @@ export default function AddMemberPage() {
 
       <main className="flex flex-1 flex-col px-5 pb-10 pt-6 lg:mx-auto lg:w-full lg:max-w-lg lg:pb-6">
         <form onSubmit={handleSubmit} className="flex flex-col gap-6">
+          {error && (
+            <div className="rounded-lg border-l-4 border-status-overdue bg-status-overdue/10 px-4 py-3 text-sm font-medium text-status-overdue">
+              {error}
+            </div>
+          )}
           <label className="flex flex-col gap-1.5">
             <span className="text-xs font-bold uppercase tracking-wider text-ink-secondary">Full Name</span>
             <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g., Jane Doe" className={inputClass} />
@@ -105,6 +141,16 @@ export default function AddMemberPage() {
               </div>
               <input type="number" inputMode="decimal" step="0.01" value={fee} onChange={(e) => setFee(e.target.value)} placeholder="500" className={`${inputClass} pl-8`} />
             </div>
+          </label>
+
+          <label className="flex flex-col gap-1.5">
+            <span className="text-xs font-bold uppercase tracking-wider text-ink-secondary">Join Date</span>
+            <input
+              type="date"
+              value={joinDate}
+              onChange={(e) => setJoinDate(e.target.value)}
+              className={inputClass}
+            />
           </label>
 
           <label className="flex flex-col gap-1.5">
