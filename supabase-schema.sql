@@ -11,20 +11,25 @@ CREATE TABLE IF NOT EXISTS public.users (
   phone         TEXT,
   business_type TEXT NOT NULL DEFAULT 'gym'
                   CHECK (business_type IN ('gym','yoga','dance')),
+  upi_id        TEXT,
+  upi_payee_name TEXT,
   created_at    TIMESTAMPTZ DEFAULT now()
 );
 
 ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users can view own profile" ON public.users;
 CREATE POLICY "Users can view own profile"
   ON public.users FOR SELECT
   USING (id = auth.uid());
 
+DROP POLICY IF EXISTS "Users can update own profile" ON public.users;
 CREATE POLICY "Users can update own profile"
   ON public.users FOR UPDATE
   USING (id = auth.uid())
   WITH CHECK (id = auth.uid());
 
+DROP POLICY IF EXISTS "Users can insert own profile" ON public.users;
 CREATE POLICY "Users can insert own profile"
   ON public.users FOR INSERT
   WITH CHECK (id = auth.uid());
@@ -47,19 +52,23 @@ CREATE TABLE IF NOT EXISTS public.members (
 
 ALTER TABLE public.members ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Tenant can view own members" ON public.members;
 CREATE POLICY "Tenant can view own members"
   ON public.members FOR SELECT
   USING (tid = auth.uid());
 
+DROP POLICY IF EXISTS "Tenant can insert own members" ON public.members;
 CREATE POLICY "Tenant can insert own members"
   ON public.members FOR INSERT
   WITH CHECK (tid = auth.uid());
 
+DROP POLICY IF EXISTS "Tenant can update own members" ON public.members;
 CREATE POLICY "Tenant can update own members"
   ON public.members FOR UPDATE
   USING (tid = auth.uid())
   WITH CHECK (tid = auth.uid());
 
+DROP POLICY IF EXISTS "Tenant can delete own members" ON public.members;
 CREATE POLICY "Tenant can delete own members"
   ON public.members FOR DELETE
   USING (tid = auth.uid());
@@ -80,19 +89,23 @@ CREATE TABLE IF NOT EXISTS public.payments (
 
 ALTER TABLE public.payments ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Tenant can view own payments" ON public.payments;
 CREATE POLICY "Tenant can view own payments"
   ON public.payments FOR SELECT
   USING (tid = auth.uid());
 
+DROP POLICY IF EXISTS "Tenant can insert own payments" ON public.payments;
 CREATE POLICY "Tenant can insert own payments"
   ON public.payments FOR INSERT
   WITH CHECK (tid = auth.uid());
 
+DROP POLICY IF EXISTS "Tenant can update own payments" ON public.payments;
 CREATE POLICY "Tenant can update own payments"
   ON public.payments FOR UPDATE
   USING (tid = auth.uid())
   WITH CHECK (tid = auth.uid());
 
+DROP POLICY IF EXISTS "Tenant can delete own payments" ON public.payments;
 CREATE POLICY "Tenant can delete own payments"
   ON public.payments FOR DELETE
   USING (tid = auth.uid());

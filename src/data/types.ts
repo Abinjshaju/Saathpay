@@ -10,6 +10,8 @@ export interface UserProfile {
   business_type: BusinessType;
   api_key: string | null;
   secret_key: string | null;
+  upi_id: string | null;
+  upi_payee_name: string | null;
   created_at: string;
 }
 

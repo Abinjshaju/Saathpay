@@ -8,6 +8,7 @@ import PageHeader from "@/components/layout/PageHeader";
 
 const menuItems = [
   { to: "/settings/api", icon: "key", label: "API Configuration", desc: "Payment gateway credentials" },
+  { to: "/settings/upi", icon: "account_balance_wallet", label: "UPI Configuration", desc: "UPI ID for direct payments" },
   { to: "/settings/export", icon: "download", label: "Export Data", desc: "Download payment records" },
   { to: "/settings/account", icon: "person", label: "Account", desc: "Profile and preferences" },
 ];

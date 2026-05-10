@@ -11,6 +11,7 @@ import SettingsPage from "@/pages/SettingsPage";
 import ApiConfigPage from "@/pages/settings/ApiConfigPage";
 import ExportDataPage from "@/pages/settings/ExportDataPage";
 import AccountPage from "@/pages/settings/AccountPage";
+import UPIPage from "@/pages/settings/UPIPage";
 import PaymentHistoryPage from "@/pages/PaymentHistoryPage";
 
 export default function App() {
@@ -34,6 +35,7 @@ export default function App() {
           <Route path="/settings/api" element={<ApiConfigPage />} />
           <Route path="/settings/export" element={<ExportDataPage />} />
           <Route path="/settings/account" element={<AccountPage />} />
+          <Route path="/settings/upi" element={<UPIPage />} />
         </Route>
       </Route>
 

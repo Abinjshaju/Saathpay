@@ -5,7 +5,13 @@ import { useCallback } from "react";
 export function useUserProfile() {
   const { user, refreshProfile } = useAuth();
 
-  const updateProfile = useCallback(async (updates: { business_name?: string; api_key?: string; secret_key?: string }) => {
+  const updateProfile = useCallback(async (updates: { 
+    business_name?: string; 
+    api_key?: string; 
+    secret_key?: string;
+    upi_id?: string;
+    upi_payee_name?: string;
+  }) => {
     if (!user) return "Not authenticated";
     const { error } = await supabase.from("users").update(updates).eq("id", user.id);
     if (error) return error.message;

@@ -98,14 +98,23 @@ export default function MemberDetailPage() {
         year: "numeric",
       });
 
-      const body = `SaathPay Reminder: 
+      let body = `SaathPay Reminder: 
 
 Dear ${member.name}, 
 This is a friendly reminder from ${businessName}. Your monthly fee of ₹${amount} is due on ${formattedDate}.
 
-Please ensure payment is made by the due date. If you have already paid, please ignore this message.
+Please ensure payment is made by the due date. If you have already paid, please ignore this message.`;
 
-Regards,
+      if (profile.upi_id) {
+        const upiId = profile.upi_id;
+        const payeeName = encodeURIComponent(profile.upi_payee_name || businessName);
+        const note = encodeURIComponent(`Payment for ${formattedDate}`);
+        const upiLink = `upi://pay?pa=${upiId}&pn=${payeeName}&am=${member.monthly_fee}&cu=INR&tn=${note}`;
+        
+        body += `\n\nPay Now via UPI: ${upiLink}`;
+      }
+
+      body += `\n\nRegards,
 ${businessName}`;
 
       await sendTwilioMessage({
