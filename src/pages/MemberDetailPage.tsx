@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import PageHeader from "@/components/layout/PageHeader";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
@@ -60,7 +60,6 @@ export default function MemberDetailPage() {
     }).eq("id", markingId);
     
     // Update member status
-    const currentMonth = `${MONTH_NAMES[today.getMonth()]} ${today.getFullYear()}`;
     await supabase.from("members").update({ 
       status: "paid", 
       // status_label: `Paid for ${currentMonth}` // Missing in DB

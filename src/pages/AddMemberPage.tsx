@@ -22,9 +22,11 @@ export default function AddMemberPage() {
   useEffect(() => {
     if (!id) return;
     
-    setLoadingEdit(true);
-    supabase.from("members").select("*").eq("id", id).single()
-      .then(({ data, error: err }) => {
+    async function fetchMember() {
+      setLoadingEdit(true);
+      try {
+        const { data, error: err } = await supabase.from("members").select("*").eq("id", id).single();
+        
         if (err) {
           console.error("Error fetching member:", err);
           setError(err.message);
@@ -38,13 +40,15 @@ export default function AddMemberPage() {
           const r = (m as any).reminder_start_date;
           setReminderStart(r ? String(r).slice(0, 10) : "");
         }
-        setLoadingEdit(false);
-      })
-      .catch((err) => {
+      } catch (err: any) {
         console.error("Unexpected error fetching member:", err);
         setError("Failed to load member details");
+      } finally {
         setLoadingEdit(false);
-      });
+      }
+    }
+
+    fetchMember();
   }, [id]);
 
   async function handleSubmit(e?: FormEvent) {
